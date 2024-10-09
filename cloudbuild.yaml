@@ -97,3 +97,5 @@ substitutions:
   _PROJECT_ID: 'occdemo'
   _EXPERIMENT_ID: 'c7828c74-b5fe-46b1-a5e6-4b21bab7dd4a'
   _EXPECTED_RES_SCORE: '100'
+options:
+  logging: 'CLOUD_LOGGING_ONLY'
