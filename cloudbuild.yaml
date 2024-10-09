@@ -1,0 +1,99 @@
+steps:
+  # Step 3: Step to configure kubectl to use the correct GKE cluster and context
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: cluster_access
+    args:
+      - 'container'
+      - 'clusters'
+      - 'get-credentials'
+      - 'test-discovery'
+      - '--zone'
+      - 'us-central1-c'
+      - '--project'
+      - '$PROJECT_ID'
+  #Step 4: Deploy and wait for the deployment to complete 
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: Deploy 
+    entrypoint: 'bash'
+    waitFor: ['cluster_access']
+    args:
+      - '-c'
+      - |
+         PROJECT=$$(gcloud config get-value core/project)          
+         gke-gcloud-auth-plugin --version
+         export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+         gcloud container clusters get-credentials test-discovery --zone us-central1-c --project chaos-demo-play
+         kubectl apply -f k8s/cart-deployment.yaml -n boutique
+         kubectl rollout status deployment/cartservice -n boutique
+
+  #Step5: Run Chaos Experiment
+  - name: 'gcr.io/$PROJECT_ID/hce-cli'
+    id: chaos
+    allowFailure: true
+    secretEnv: ['API_KEY']
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        hce-cli generate \
+        --api=run-and-monitor-experiment \
+        --account-id=${_ACCOUNT_ID} \
+        --org-id=${_ORG_ID} \
+        --project-id=${_PROJECT_ID} \
+        --workflow-id=${_EXPERIMENT_ID} \
+        --expected-resilience-score=${_EXPECTED_RES_SCORE} \
+        --api-key=$$API_KEY
+        if [ $? -ne 0 ]; then
+          echo "Chaos experiment failed. Creating chaos_failed_flag..."
+          echo "1" > /workspace/chaos_failed_flag
+        else
+          echo "Chaos experiment succeeded."
+          echo "0" > /workspace/chaos_failed_flag
+        fi
+  # Step 6: Rollback if chaos experiment failed
+  - name: 'gcr.io/cloud-builders/kubectl'
+    entrypoint: "bash"
+    id: Rollback
+    args:
+      - "-c"
+      - | 
+
+          cat /workspace/chaos_failed_flag
+          if [[ -f /workspace/chaos_failed_flag ]] && grep -q "1" /workspace/chaos_failed_flag; then
+
+             echo "Rolling back deployment..."
+             kubectl rollout undo deployment/cartservice -n boutique
+             kubectl rollout status deployment/cartservice -n boutique
+          else
+             echo "No rollback necessary."
+          fi
+    waitFor: ['chaos']
+    allowFailure: true
+
+
+  # Step 7: Notification
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: "bash"
+    allowFailure: true
+    waitFor: ['Rollback']
+    args:
+      - "-c"
+      - |
+        if [[ -f /workspace/chaos_failed_flag ]] && grep -q "1" /workspace/chaos_failed_flag; then
+          echo "Rollback occurred for cartservice. Deployment failed."
+        else
+          echo "Deployment of cartservice version was successful."
+        fi
+
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/adarsh-harness-x-api-key/versions/latest      
+    env: API_KEY
+
+substitutions:
+  _ACCOUNT_ID: 'cTU1lRSWS2SSRV9phKvuOA'
+  _ORG_ID: 'default'
+  _PROJECT_ID: 'occdemo'
+  _EXPERIMENT_ID: 'c7828c74-b5fe-46b1-a5e6-4b21bab7dd4a'
+  _EXPECTED_RES_SCORE: '100'
