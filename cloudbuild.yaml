@@ -1,14 +1,16 @@
 steps:
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
+    id: Build
     args: ['build', '-t', 'gcr.io/$_PROJECT/cartservice:${_VERSION}', '.']
   # Step 2: Push the Docker image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
+    id: Push
     args: ['push', 'gcr.io/$_PROJECT/cartservice:${_VERSION}']
 
   # Step 3: Step to configure kubectl to use the correct GKE cluster and context
   - name: 'gcr.io/cloud-builders/gcloud'
-    id: cluster_access
+    id: Cluster_access
     args:
       - 'container'
       - 'clusters'
@@ -20,6 +22,7 @@ steps:
       - '$_PROJECT'
   # Step 4: Update the container image using kubectl set
   - name: 'gcr.io/cloud-builders/kubectl'
+    id: Updating_image
     args:
     - 'set'
     - 'image'
@@ -32,7 +35,7 @@ steps:
 
   #Step 5: Wait for the rollout
   - name: 'gcr.io/cloud-builders/kubectl'
-    id: wait
+    id: Wait
     args:
     - 'rollout'
     - 'status'
@@ -44,10 +47,10 @@ steps:
 
   #Step6: Run Chaos Experiment
   - name: 'gcr.io/$_PROJECT/hce-cli'
-    id: chaos
+    id: Chaos
     allowFailure: true
     secretEnv: ['API_KEY']
-    waitFor: ['wait']
+    waitFor: ['Wait']
     entrypoint: "bash"
     args:
       - "-c"
@@ -89,7 +92,7 @@ steps:
           else
              echo "No rollback necessary."
           fi
-    waitFor: ['chaos']
+    waitFor: ['Chaos']
     allowFailure: true
 
 
@@ -97,6 +100,7 @@ steps:
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: "bash"
     allowFailure: true
+    id: Notification
     waitFor: ['Rollback']
     args:
       - "-c"
