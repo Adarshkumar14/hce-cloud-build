@@ -128,7 +128,7 @@ substitutions:
   _PROJECT_ID: 'adarshdemo'
   _EXPERIMENT_ID: '97229bf7-adab-4e76-a1f2-02393449bff5'
   _EXPECTED_RES_SCORE: '100'
-  _VERSION: v1.0
+  _VERSION: v2.0
 
 options:
   logging: 'CLOUD_LOGGING_ONLY'
