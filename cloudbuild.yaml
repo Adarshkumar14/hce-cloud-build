@@ -2,11 +2,11 @@ steps:
   # Step 1: Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
     id: Build
-    args: ['build', '-t', 'gcr.io/$_PROJECT/cartservice:${_VERSION}', '.']
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$_PROJECT/cartservice:${_VERSION}', '.']
   # Step 2: Push the Docker image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     id: Push
-    args: ['push', 'gcr.io/$_PROJECT/cartservice:${_VERSION}']
+    args: ['push', 'us-central1-docker.pkg.dev/$_PROJECT/cartservice:${_VERSION}']
 
   # Step 3: Step to configure kubectl to use the correct GKE cluster and context
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -46,7 +46,7 @@ steps:
     - 'CLOUDSDK_CONTAINER_CLUSTER=${_GKE_CLUSTER}'
 
   #Step6: Run Chaos Experiment
-  - name: 'gcr.io/$_PROJECT/hce-cli'
+  - name: 'us-central1-docker.pkg.dev/$PROJECT_ID/harness-chaos'
     id: Chaos
     allowFailure: true
     secretEnv: ['API_KEY']
@@ -58,7 +58,7 @@ steps:
         hce-cli config create  \
         --name "my-config-1" \
         --interactive=false 
-
+        
         hce-cli experiment run \
         --account-id "${_ACCOUNT_ID}" \
         --org-id "${_ORG_ID}" \
